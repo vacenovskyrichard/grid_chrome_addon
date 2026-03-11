@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Grid Overlay for Volleyball Analysis",
+  "description": "Interactive volleyball court grid overlay for video analysis",
+  "version": "1.0",
+  "icons": {
+    "16": "icon128.png",
+    "48": "icon128.png",
+    "128": "icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*", "https://tv.volleyballworld.com/*"],
+      "js": ["perspective-transform.js", "grid.js", "content.js"]
+    }
+  ]
+}
