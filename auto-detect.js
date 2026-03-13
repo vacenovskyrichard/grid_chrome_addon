@@ -1,4 +1,5 @@
 function createCourtDetector() {
+  const DEBUG = false;
   const MODEL_SIZE = 640;
   const ROI_TOP_RATIO = 0.08;
   const ROI_BOTTOM_RATIO = 0.95;
@@ -15,6 +16,10 @@ function createCourtDetector() {
   }
 
   function debugLog(message, extra) {
+    if (!DEBUG) {
+      return;
+    }
+
     if (typeof extra === "undefined") {
       console.log(DEBUG_PREFIX, message);
       return;
@@ -29,6 +34,10 @@ function createCourtDetector() {
   }
 
   function setDebugSnapshot(snapshot) {
+    if (!DEBUG) {
+      return;
+    }
+
     debugSnapshot = snapshot;
     window.__courtDetectorDebug = snapshot;
   }
@@ -958,7 +967,9 @@ function createCourtDetector() {
       },
       maskFillPointCount: maskPoints.length,
       maskBoundaryPointCount: points.length,
-      maskCanvas: createDebugMaskCanvas(mask, frame.width, frame.height).toDataURL(),
+      maskCanvas: DEBUG
+        ? createDebugMaskCanvas(mask, frame.width, frame.height).toDataURL()
+        : null,
     });
 
     try {
@@ -1018,7 +1029,9 @@ function createCourtDetector() {
       debugLog("trying ONNX model inference");
       return await detectWithModel(video);
     } catch (error) {
-      console.warn("Model-based court detection failed, falling back to heuristics.", error);
+      if (DEBUG) {
+        console.warn("Model-based court detection failed, falling back to heuristics.", error);
+      }
       debugLog("model inference failed", {
         message: error.message,
         stack: error.stack,

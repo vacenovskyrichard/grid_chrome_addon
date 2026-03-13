@@ -94,6 +94,8 @@ function initGrid(canvas, video) {
   }
 
   document.addEventListener("keydown", (e) => {
+    if (e.repeat) return;
+
     if (e.key === "Shift") {
       shiftPressed = true;
       draw();
