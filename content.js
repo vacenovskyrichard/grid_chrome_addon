@@ -44,7 +44,7 @@ function initWhenVideoReady() {
     subtree: true,
   });
 
-  initGrid(canvas);
+  initGrid(canvas, video);
 }
 
 initWhenVideoReady();

@@ -11,7 +11,23 @@
   "content_scripts": [
     {
       "matches": ["*://*.youtube.com/*", "https://tv.volleyballworld.com/*"],
-      "js": ["perspective-transform.js", "grid.js", "content.js"]
+      "js": [
+        "perspective-transform.js",
+        "node_modules/onnxruntime-web/dist/ort.all.min.js",
+        "auto-detect.js",
+        "grid.js",
+        "content.js"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "models/*.onnx",
+        "node_modules/onnxruntime-web/dist/*.wasm",
+        "node_modules/onnxruntime-web/dist/*.mjs"
+      ],
+      "matches": ["<all_urls>"]
     }
   ]
 }

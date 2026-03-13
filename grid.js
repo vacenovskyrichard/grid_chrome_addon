@@ -1,16 +1,25 @@
-function initGrid(canvas) {
+function initGrid(canvas, video) {
   const ctx = canvas.getContext("2d");
+  const detector = window.createCourtDetector();
+  let isAutoMapping = false;
+  let statusMessage = "";
+  let statusTimeoutId = null;
 
-  const w = canvas.width;
-  const h = canvas.height;
-
-  const gridWidth = w * 0.5;
-  const gridHeight = h * 0.5;
-
-  const cx = w / 2;
-  const cy = h / 2;
+  detector.warmup().then((state) => {
+    if (!state.ready) {
+      console.info("Court detector fallback mode:", state.error);
+      setStatus("ONNX runtime missing, using heuristic auto-map.");
+    }
+  });
 
   function createCenteredGrid() {
+    const w = canvas.width;
+    const h = canvas.height;
+    const gridWidth = w * 0.5;
+    const gridHeight = h * 0.5;
+    const cx = w / 2;
+    const cy = h / 2;
+
     return [
       { x: cx - gridWidth / 2, y: cy - gridHeight / 2 },
       { x: cx + gridWidth / 2, y: cy - gridHeight / 2 },
@@ -27,10 +36,71 @@ function initGrid(canvas) {
 
   let shiftPressed = false;
 
+  function hasValidCorners(value) {
+    return (
+      Array.isArray(value) &&
+      value.length === 4 &&
+      value.every(
+        (corner) =>
+          corner &&
+          Number.isFinite(corner.x) &&
+          Number.isFinite(corner.y),
+      )
+    );
+  }
+
+  function setStatus(message, persist = false) {
+    statusMessage = message;
+    if (statusTimeoutId) {
+      clearTimeout(statusTimeoutId);
+      statusTimeoutId = null;
+    }
+
+    if (!persist) {
+      statusTimeoutId = setTimeout(() => {
+        statusMessage = "";
+        draw();
+      }, 2500);
+    }
+
+    draw();
+  }
+
+  async function autoMapGrid() {
+    if (isAutoMapping) return;
+    if (!video.videoWidth || !video.videoHeight) {
+      setStatus("Video frame is not ready yet.");
+      return;
+    }
+
+    isAutoMapping = true;
+    setStatus("Auto-mapping court...", true);
+
+    try {
+      const detectedCorners = await detector.detect(video);
+      if (!hasValidCorners(detectedCorners)) {
+        throw new Error("Detector returned invalid corners.");
+      }
+
+      corners = detectedCorners;
+      setStatus("Court mapped automatically.");
+    } catch (error) {
+      console.error(error);
+      setStatus("Automatic mapping failed, keep using Shift for manual adjust.");
+    } finally {
+      isAutoMapping = false;
+      draw();
+    }
+  }
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Shift") {
       shiftPressed = true;
       draw();
+    }
+
+    if (e.key.toLowerCase() === "m") {
+      autoMapGrid();
     }
 
     if (e.key.toLowerCase() === "r") {
@@ -128,6 +198,10 @@ function initGrid(canvas) {
   }
 
   function getTransform() {
+    if (!hasValidCorners(corners)) {
+      return null;
+    }
+
     return PerspT(
       [0, 0, 1, 0, 1, 1, 0, 1],
       [
@@ -145,6 +219,9 @@ function initGrid(canvas) {
 
   function drawGrid() {
     const transform = getTransform();
+    if (!transform || typeof transform.transform !== "function") {
+      return;
+    }
 
     ctx.shadowColor = "black";
     ctx.shadowBlur = 2;
@@ -211,11 +288,30 @@ function initGrid(canvas) {
     });
   }
 
+  function drawStatus() {
+    if (!statusMessage) return;
+
+    ctx.save();
+    ctx.font = "14px sans-serif";
+    const padding = 10;
+    const metrics = ctx.measureText(statusMessage);
+    const boxWidth = metrics.width + padding * 2;
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    ctx.fillRect(16, 16, boxWidth, 34);
+
+    ctx.fillStyle = "white";
+    ctx.textBaseline = "middle";
+    ctx.fillText(statusMessage, 16 + padding, 33);
+    ctx.restore();
+  }
+
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     drawGrid();
     drawCorners();
+    drawStatus();
   }
 
   window.addEventListener("grid-redraw", () => {
