@@ -2,16 +2,40 @@
   "manifest_version": 3,
   "name": "Grid Overlay for Volleyball Analysis",
   "description": "Interactive volleyball court grid overlay for video analysis",
-  "version": "1.0",
+  "version": "1.1",
   "icons": {
     "16": "icon128.png",
     "48": "icon128.png",
     "128": "icon128.png"
   },
-  "content_scripts": [
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon128.png",
+      "48": "icon128.png",
+      "128": "icon128.png"
+    }
+  },
+  "permissions": [
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "https://tv.volleyballworld.com/*",
+    "<all_urls>"
+  ],
+  "web_accessible_resources": [
     {
-      "matches": ["*://*.youtube.com/*", "https://tv.volleyballworld.com/*"],
-      "js": ["perspective-transform.js", "grid.js", "content.js"]
+      "resources": [
+        "models/*.onnx",
+        "node_modules/onnxruntime-web/dist/*.wasm",
+        "node_modules/onnxruntime-web/dist/*.mjs"
+      ],
+      "matches": ["<all_urls>"]
     }
   ]
 }
