@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Grid Overlay</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f12;
+      --surface: #1a1a20;
+      --surface2: #22222b;
+      --border: #2e2e3a;
+      --accent: #4f8ef7;
+      --accent-dim: rgba(79,142,247,0.15);
+      --danger: #e05555;
+      --danger-dim: rgba(224,85,85,0.15);
+      --text: #e8e8f0;
+      --muted: #7070a0;
+      --green: #4caf7d;
+      --green-dim: rgba(76,175,125,0.15);
+      --radius: 8px;
+      --font: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      width: 320px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      padding: 0 0 12px;
+      user-select: none;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+    }
+
+    .logo svg { flex-shrink: 0; }
+
+    /* ── Toggle switch ── */
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toggle-label {
+      font-size: 12px;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+
+    .toggle-label.on { color: var(--green); }
+
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .toggle input { display: none; }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .toggle input:checked ~ .toggle-track {
+      background: var(--green-dim);
+      border-color: var(--green);
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 12px;
+      height: 12px;
+      background: var(--muted);
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .toggle input:checked ~ .toggle-thumb { transform: translateX(16px); background: var(--green); }
+
+    /* ── Sections ── */
+    section {
+      padding: 12px 16px 0;
+    }
+
+    .section-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    /* ── Shortcut rows ── */
+    .shortcut-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 6px;
+    }
+
+    .shortcut-name {
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .shortcut-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kbd-display {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+    }
+
+    kbd {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-family: monospace;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .btn-edit {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 5px;
+      width: 22px;
+      height: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+
+    .btn-edit:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Recording state ── */
+    .shortcut-row.recording {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .recording-hint {
+      font-size: 11px;
+      color: var(--accent);
+      font-style: italic;
+    }
+
+    /* ── Sites list ── */
+    .site-list { display: flex; flex-direction: column; gap: 6px; }
+
+    .site-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .site-item span {
+      flex: 1;
+      font-size: 11px;
+      font-family: monospace;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .btn-remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+      flex-shrink: 0;
+    }
+
+    .btn-remove:hover { color: var(--danger); background: var(--danger-dim); }
+
+    .add-site-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .add-site-row input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 6px 10px;
+      font-size: 11px;
+      font-family: monospace;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .add-site-row input:focus { border-color: var(--accent); }
+    .add-site-row input::placeholder { color: var(--muted); }
+
+    .btn-add {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: var(--radius);
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+
+    .btn-add:hover { background: rgba(79,142,247,0.28); }
+
+    .hint {
+      margin-top: 5px;
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .save-notice {
+      text-align: center;
+      font-size: 11px;
+      color: var(--green);
+      padding-top: 10px;
+      height: 22px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .save-notice.show { opacity: 1; }
+
+    /* ── Controls hint ── */
+    .controls-hint {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .controls-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+    }
+
+    .controls-row span { color: var(--muted); }
+    .controls-row kbd { color: var(--text); }
+
+    .controls-desc {
+      margin-left: auto;
+      color: var(--muted) !important;
+      font-size: 11px;
+    }
+
+    /* ── Disabled toggle (non-matched tab) ── */
+    .toggle input:disabled ~ .toggle-track { opacity: 0.4; }
+    .toggle input:disabled ~ .toggle-thumb { opacity: 0.4; }
+    .toggle:has(input:disabled) { cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect x="1" y="1" width="16" height="16" rx="2" stroke="#4f8ef7" stroke-width="1.5"/>
+        <line x1="1" y1="6" x2="17" y2="6" stroke="#4f8ef7" stroke-width="1"/>
+        <line x1="1" y1="12" x2="17" y2="12" stroke="#4f8ef7" stroke-width="1"/>
+        <line x1="6" y1="1" x2="6" y2="17" stroke="#4f8ef7" stroke-width="1"/>
+        <line x1="12" y1="1" x2="12" y2="17" stroke="#4f8ef7" stroke-width="1"/>
+        <line x1="1" y1="9" x2="17" y2="9" stroke="#e05555" stroke-width="1.5"/>
+      </svg>
+      Grid Overlay
+    </div>
+
+    <div class="toggle-wrap">
+      <span class="toggle-label" id="toggleLabel">OFF</span>
+      <label class="toggle">
+        <input type="checkbox" id="gridToggle" />
+        <span class="toggle-track"></span>
+        <span class="toggle-thumb"></span>
+      </label>
+    </div>
+  </header>
+
+  <section>
+    <div class="section-title">Keyboard Shortcuts</div>
+
+    <div class="shortcut-row" id="row-map">
+      <span class="shortcut-name">Auto-map court</span>
+      <div class="shortcut-right">
+        <div class="kbd-display" id="kbd-map"></div>
+        <button class="btn-edit" data-action="map" title="Change shortcut">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+            <path d="M8.5 1.5a1.5 1.5 0 0 1 2.12 2.12L9.5 4.74 7.26 2.5 8.5 1.5zM1 9l6-6 2.24 2.24-6 6H1V9z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="shortcut-row" id="row-reset">
+      <span class="shortcut-name">Reset grid</span>
+      <div class="shortcut-right">
+        <div class="kbd-display" id="kbd-reset"></div>
+        <button class="btn-edit" data-action="reset" title="Change shortcut">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+            <path d="M8.5 1.5a1.5 1.5 0 0 1 2.12 2.12L9.5 4.74 7.26 2.5 8.5 1.5zM1 9l6-6 2.24 2.24-6 6H1V9z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="shortcut-row" id="row-toggle">
+      <span class="shortcut-name">Toggle grid visibility</span>
+      <div class="shortcut-right">
+        <div class="kbd-display" id="kbd-toggle"></div>
+        <button class="btn-edit" data-action="toggle" title="Change shortcut">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+            <path d="M8.5 1.5a1.5 1.5 0 0 1 2.12 2.12L9.5 4.74 7.26 2.5 8.5 1.5zM1 9l6-6 2.24 2.24-6 6H1V9z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">Manual Adjustment</div>
+    <div class="controls-hint">
+      <div class="controls-row">
+        <kbd>Shift</kbd><span>+ drag</span>
+        <span class="controls-desc">Move corner or whole grid</span>
+      </div>
+      <div class="controls-row">
+        <kbd>Shift</kbd><span>+ scroll</span>
+        <span class="controls-desc">Rotate grid</span>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:6px">Hold <strong>Shift</strong> to reveal corner handles, then drag them to fit the court precisely.</div>
+  </section>
+
+  <section>
+    <div class="section-title">Active on Sites</div>
+    <div class="site-list" id="siteList"></div>
+    <div class="add-site-row">
+      <input type="text" id="siteInput" placeholder="*://*.example.com/*" />
+      <button class="btn-add" id="addSiteBtn">Add</button>
+    </div>
+    <div class="hint">Use Chrome match patterns, e.g. <code>*://*.example.com/*</code></div>
+  </section>
+
+  <div class="save-notice" id="saveNotice">✓ Saved</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

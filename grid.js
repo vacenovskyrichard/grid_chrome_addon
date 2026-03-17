@@ -5,6 +5,73 @@ function initGrid(canvas, video) {
   let statusMessage = "";
   let statusTimeoutId = null;
 
+  // ── Visibility is per-tab, lives only in memory ───────────────────────────
+  // Starts hidden on every new tab. The user enables it when they need it.
+  let gridVisible = false;
+  // Tracks whether a grid has ever been placed on this tab yet.
+  // On the very first "show", we auto-create the centered default — so the
+  // user immediately sees something without needing to press Reset too.
+  let gridInitialized = false;
+
+  // ── Shortcuts live in chrome.storage so they persist across sessions ──────
+  const DEFAULT_SHORTCUTS = {
+    map:    { key: "m", alt: true,  shift: false, ctrl: false },
+    reset:  { key: "r", alt: true,  shift: false, ctrl: false },
+    toggle: { key: "h", alt: true,  shift: false, ctrl: false },
+  };
+
+  function mergeShortcuts(stored) {
+    const merged = {};
+    for (const action of ["map", "reset", "toggle"]) {
+      const def = DEFAULT_SHORTCUTS[action];
+      const src = (stored && stored[action]) || {};
+      merged[action] = {
+        key:   typeof src.key   === "string"  ? src.key   : def.key,
+        alt:   typeof src.alt   === "boolean" ? src.alt   : def.alt,
+        shift: typeof src.shift === "boolean" ? src.shift : def.shift,
+        ctrl:  typeof src.ctrl  === "boolean" ? src.ctrl  : def.ctrl,
+      };
+    }
+    return merged;
+  }
+
+  let shortcuts = mergeShortcuts(null);
+
+  chrome.storage.sync.get({ shortcuts: DEFAULT_SHORTCUTS }, (data) => {
+    shortcuts = mergeShortcuts(data.shortcuts);
+  });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "sync" && changes.shortcuts) {
+      shortcuts = mergeShortcuts(changes.shortcuts.newValue);
+    }
+  });
+
+  // ── Popup communication ───────────────────────────────────────────────────
+  // The popup queries this tab's grid state when it opens, and can toggle it.
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message.type === "getGridVisible") {
+      sendResponse({ gridVisible });
+      return true;
+    }
+    if (message.type === "setGridVisible") {
+      showGrid(message.value);
+      sendResponse({ ok: true });
+      return true;
+    }
+  });
+
+  // ── Show/hide logic ───────────────────────────────────────────────────────
+  // Centralised function: turning on for the first time auto-creates the grid.
+  function showGrid(visible) {
+    gridVisible = visible;
+    if (visible && !gridInitialized) {
+      corners = createCenteredGrid();
+      gridInitialized = true;
+    }
+    draw();
+  }
+
   detector.warmup().then((state) => {
     if (!state.ready) {
       console.info("Court detector fallback mode:", state.error);
@@ -73,6 +140,9 @@ function initGrid(canvas, video) {
       return;
     }
 
+    // Auto-map always shows the grid (and initialises if needed)
+    if (!gridVisible) showGrid(true);
+
     isAutoMapping = true;
     setStatus("Auto-mapping court...", true);
 
@@ -83,14 +153,25 @@ function initGrid(canvas, video) {
       }
 
       corners = detectedCorners;
+      gridInitialized = true;
       setStatus("Court mapped automatically.");
     } catch (error) {
       console.error(error);
-      setStatus("Automatic mapping failed, keep using Shift for manual adjust.");
+      setStatus("Automatic mapping failed. Use Shift+drag to adjust manually.");
     } finally {
       isAutoMapping = false;
       draw();
     }
+  }
+
+  function matchesShortcut(e, binding) {
+    if (!binding) return false;
+    return (
+      e.key.toLowerCase() === binding.key.toLowerCase() &&
+      !!e.altKey   === !!binding.alt   &&
+      !!e.shiftKey === !!binding.shift &&
+      !!e.ctrlKey  === !!binding.ctrl
+    );
   }
 
   document.addEventListener("keydown", (e) => {
@@ -99,15 +180,28 @@ function initGrid(canvas, video) {
     if (e.key === "Shift") {
       shiftPressed = true;
       draw();
+      return;
     }
 
-    if (e.key.toLowerCase() === "m") {
+    if (matchesShortcut(e, shortcuts.map)) {
+      e.preventDefault();
       autoMapGrid();
+      return;
     }
 
-    if (e.key.toLowerCase() === "r") {
+    if (matchesShortcut(e, shortcuts.reset)) {
+      e.preventDefault();
       corners = createCenteredGrid();
-      draw();
+      gridInitialized = true;
+      // Reset always shows the grid — no point resetting an invisible grid
+      showGrid(true);
+      return;
+    }
+
+    if (matchesShortcut(e, shortcuts.toggle)) {
+      e.preventDefault();
+      showGrid(!gridVisible);
+      return;
     }
   });
 
@@ -310,6 +404,8 @@ function initGrid(canvas, video) {
 
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!gridVisible) return; // nothing to paint — cheapest possible off state
 
     drawGrid();
     drawCorners();
