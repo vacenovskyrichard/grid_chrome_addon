@@ -1,73 +1,96 @@
 # grid_chrome_addon
 
-Chrome addon pro overlay 10×5 gridu na beachvolejbalové hřiště. Grid je perspektivně transformovaný podle detekovaných rohů kurtu a zobrazuje se přes video v prohlížeči.
+Chrome extension pro overlay 10x5 gridu na beachvolejbalove hriste. Grid se zobrazuje pres video v prohlizeci a umi automaticke namapovani kurtu.
 
 ---
 
-## Použití
+## Jak extension nainstalovat do Chrome
 
-Grid je na každé záložce ve výchozím stavu skrytý. Zapneš ho buď přes popup addonů (ikona v liště), nebo klávesovou zkratkou.
+Postup krok za krokem:
 
-### Klávesové zkratky (výchozí)
+1. Klikni na zelene tlacitko `Code`.
+
+2. Vyber `Download ZIP`.
+
+3. Pockej, az se ZIP soubor stahne do pocitace.
+4. ZIP soubor rozbal.
+5. Otevri Google Chrome.
+6. Vpravo nahore klikni na ikonu `Extensions`.
+
+7. Ikona `Extensions` vypada jako maly dil puzzle.
+8. Klikni na `Manage extensions` nebo `Spravovat rozsireni`.
+
+9. Vpravo nahore zapni `Developer mode`.
+
+10. Klikni na `Load unpacked` nebo `Nacist rozbalene`.
+
+11. Vyber rozbalenou slozku repozitare.
+12. Extension se nacte do Chrome jako nova lokalni extension.
+
+Pokud se extension nacte spravne, uvidis ji v seznamu rozsireni.
+
+Poznamka:
+
+- Pokud budes chtit do README doplnit i screenshoty, staci je ulozit do slozky `images/` a potom je sem muzu dopsat jako obrazky.
+
+---
+
+## Pouziti
+
+Vychozi klavesove zkratky:
 
 | Zkratka | Funkce |
 |---|---|
-| `Alt+H` | Zobrazit / skrýt grid |
+| `Alt+H` | Zobrazit nebo skryt grid |
 | `Alt+M` | Automaticky namapovat kurt |
-| `Alt+R` | Resetovat grid do středu obrazovky |
-| `Shift` + tažení | Přesunout roh nebo celý grid |
+| `Alt+R` | Resetovat grid do stredu obrazovky |
+| `Shift` + tazeni | Presunout roh nebo cely grid |
 | `Shift` + scroll | Rotovat grid |
 
-> Všechny zkratky lze změnit v popupu addonů.
+Popup extension umoznuje:
 
-### Popup
-
-Kliknutím na ikonu addonů v liště se otevře popup s těmito možnostmi:
-
-- **Přepínač ON/OFF** — zobrazí nebo skryje grid na aktuální záložce. Každá záložka má vlastní stav; vypnutí gridu na jednom videu neovlivní ostatní záložky.
-- **Klávesové zkratky** — u každé akce lze kliknout na ikonu tužky a stisknout novou kombinaci kláves. Změna se uloží okamžitě.
-- **Aktivní weby** — seznam URL vzorů, na kterých addon funguje. Lze přidávat a odebírat bez nutnosti restartovat prohlížeč.
+- zapnout nebo vypnout grid
+- zmenit klavesove zkratky
+- upravit seznam webu, na kterych extension funguje
 
 ---
 
-## Chování gridu
+## Chovani gridu
 
-- Při prvním zobrazení gridu na záložce (přepínačem nebo zkratkou) se automaticky vytvoří výchozí centrovaný grid — není potřeba mačkat Reset zvlášť.
-- `Alt+M` a `Alt+R` grid zároveň zobrazí, pokud byl skrytý.
-- Pozice gridu se pamatuje po dobu otevřené záložky. Zavřením záložky se pozice resetuje.
-
----
-
-## Automatické mapování
-
-Addon se nejdřív pokusí použít YOLOv8 ONNX segmentační model `models/yolov8s-field-50.onnx`:
-- z masky hřiště dopočítá 4 dominantní čáry a z jejich průsečíků rohy
-- pokud modelová inference není dostupná, spadne zpět na jednoduchou heuristiku nad modrými lajnami
+- Pri prvnim zobrazeni na zalozce se vytvori vychozi centrovany grid.
+- `Alt+M` a `Alt+R` grid zaroven zobrazi, pokud byl skryty.
+- Pozice gridu se pamatuje po dobu otevrene zalozky.
 
 ---
 
-## Technické závislosti
+## Automaticke mapovani
 
-- `onnxruntime-web` je nainstalovaný jako lokální závislost v `node_modules`
-- extension načítá `node_modules/onnxruntime-web/dist/ort.all.min.js`
-- WASM assety jsou vystaveny přes `web_accessible_resources`
-- Injekce content scriptů je dynamická (přes `chrome.scripting`) — umožňuje měnit seznam webů za běhu bez restartu addonů
+Extension se nejdriv pokusi pouzit YOLOv8 ONNX segmentacni model `models/yolov8s-field-50.onnx`.
+
+- Z masky hriste odhadne rohy kurtu.
+- Pokud modelova inference neni dostupna, pouzije jednodussi heuristicky fallback.
 
 ---
 
-## Struktura souborů
+## Technicke zavislosti
 
-```
-├── manifest.json          # MV3 konfigurace, oprávnění, service worker
-├── background.js          # Service worker: dynamická injekce scriptů, výchozí nastavení
-├── content.js             # Inicializace canvasu nad videem
-├── grid.js                # Logika gridu, zkratky, kreslení
-├── auto-detect.js         # YOLOv8 detektor + heuristický fallback
-├── perspective-transform.js
-├── popup.html             # UI popupu
-├── popup.js               # Logika popupu
-├── models/
-│   └── yolov8s-field-50.onnx
-└── node_modules/
-    └── onnxruntime-web/
+- `onnxruntime-web` je nainstalovany jako lokalni zavislost v `node_modules`
+- extension nacita `node_modules/onnxruntime-web/dist/ort.all.min.js`
+- WASM assety jsou vystaveny pres `web_accessible_resources`
+
+---
+
+## Struktura souboru
+
+```text
+manifest.json
+background.js
+content.js
+grid.js
+auto-detect.js
+perspective-transform.js
+popup.html
+popup.js
+models/
+node_modules/
 ```
