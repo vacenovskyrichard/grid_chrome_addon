@@ -1,4 +1,5 @@
 function initGrid(canvas, video) {
+  const IS_MAC = /\bMac\b/.test(navigator.platform) || /\bMac\b/.test(navigator.userAgent);
   const ctx = canvas.getContext("2d");
   const detector = window.createCourtDetector();
   let isAutoMapping = false;
@@ -14,11 +15,17 @@ function initGrid(canvas, video) {
   let gridInitialized = false;
 
   // ── Shortcuts live in chrome.storage so they persist across sessions ──────
-  const DEFAULT_SHORTCUTS = {
-    map:    { key: "m", alt: true,  shift: false, ctrl: false },
-    reset:  { key: "r", alt: true,  shift: false, ctrl: false },
-    toggle: { key: "h", alt: true,  shift: false, ctrl: false },
+  const LEGACY_DEFAULT_SHORTCUTS = {
+    map:    { key: "m", alt: true,  shift: false, ctrl: false, meta: false },
+    reset:  { key: "r", alt: true,  shift: false, ctrl: false, meta: false },
+    toggle: { key: "h", alt: true,  shift: false, ctrl: false, meta: false },
   };
+  const MAC_DEFAULT_SHORTCUTS = {
+    map:    { key: "m", alt: false, shift: true,  ctrl: true,  meta: false },
+    reset:  { key: "r", alt: false, shift: true,  ctrl: true,  meta: false },
+    toggle: { key: "h", alt: false, shift: true,  ctrl: true,  meta: false },
+  };
+  const DEFAULT_SHORTCUTS = IS_MAC ? MAC_DEFAULT_SHORTCUTS : LEGACY_DEFAULT_SHORTCUTS;
 
   function mergeShortcuts(stored) {
     const merged = {};
@@ -30,6 +37,7 @@ function initGrid(canvas, video) {
         alt:   typeof src.alt   === "boolean" ? src.alt   : def.alt,
         shift: typeof src.shift === "boolean" ? src.shift : def.shift,
         ctrl:  typeof src.ctrl  === "boolean" ? src.ctrl  : def.ctrl,
+        meta:  typeof src.meta  === "boolean" ? src.meta  : def.meta,
       };
     }
     return merged;
@@ -164,13 +172,27 @@ function initGrid(canvas, video) {
     }
   }
 
+  function getEventKey(e) {
+    if (typeof e.code === "string") {
+      if (e.code.startsWith("Key")) {
+        return e.code.slice(3).toLowerCase();
+      }
+      if (e.code.startsWith("Digit")) {
+        return e.code.slice(5);
+      }
+    }
+
+    return typeof e.key === "string" ? e.key.toLowerCase() : "";
+  }
+
   function matchesShortcut(e, binding) {
     if (!binding) return false;
     return (
-      e.key.toLowerCase() === binding.key.toLowerCase() &&
+      getEventKey(e) === binding.key.toLowerCase() &&
       !!e.altKey   === !!binding.alt   &&
       !!e.shiftKey === !!binding.shift &&
-      !!e.ctrlKey  === !!binding.ctrl
+      !!e.ctrlKey  === !!binding.ctrl  &&
+      !!e.metaKey  === !!binding.meta
     );
   }
 

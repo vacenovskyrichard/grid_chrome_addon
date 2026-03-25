@@ -1,13 +1,34 @@
-const DEFAULT_SHORTCUTS = {
-  map:    { key: "m", alt: true,  shift: false, ctrl: false },
-  reset:  { key: "r", alt: true,  shift: false, ctrl: false },
-  toggle: { key: "h", alt: true,  shift: false, ctrl: false },
+const IS_MAC = /\bMac\b/.test(navigator.platform) || /\bMac\b/.test(navigator.userAgent);
+
+const LEGACY_DEFAULT_SHORTCUTS = {
+  map:    { key: "m", alt: true,  shift: false, ctrl: false, meta: false },
+  reset:  { key: "r", alt: true,  shift: false, ctrl: false, meta: false },
+  toggle: { key: "h", alt: true,  shift: false, ctrl: false, meta: false },
 };
+
+const MAC_DEFAULT_SHORTCUTS = {
+  map:    { key: "m", alt: false, shift: true,  ctrl: true,  meta: false },
+  reset:  { key: "r", alt: false, shift: true,  ctrl: true,  meta: false },
+  toggle: { key: "h", alt: false, shift: true,  ctrl: true,  meta: false },
+};
+
+const DEFAULT_SHORTCUTS = IS_MAC ? MAC_DEFAULT_SHORTCUTS : LEGACY_DEFAULT_SHORTCUTS;
 
 const DEFAULT_SITES = [
   "*://*.youtube.com/*",
   "https://tv.volleyballworld.com/*",
+  "file:///",
 ];
+
+function mergeSites(stored) {
+  const merged = Array.isArray(stored) ? [...stored] : [];
+  for (const site of DEFAULT_SITES) {
+    if (!merged.includes(site)) {
+      merged.push(site);
+    }
+  }
+  return merged;
+}
 
 let shortcuts = {};
 let sites = [];
@@ -25,6 +46,7 @@ function mergeShortcuts(stored) {
       alt:   typeof src.alt   === "boolean" ? src.alt   : def.alt,
       shift: typeof src.shift === "boolean" ? src.shift : def.shift,
       ctrl:  typeof src.ctrl  === "boolean" ? src.ctrl  : def.ctrl,
+      meta:  typeof src.meta  === "boolean" ? src.meta  : def.meta,
     };
   }
   return merged;
@@ -35,6 +57,7 @@ function mergeShortcuts(stored) {
 function bindingToLabel(b) {
   const parts = [];
   if (b.ctrl)  parts.push("Ctrl");
+  if (b.meta)  parts.push("Cmd");
   if (b.alt)   parts.push("Alt");
   if (b.shift) parts.push("Shift");
   parts.push(b.key.toUpperCase());
@@ -58,6 +81,19 @@ function flashSaved() {
   setTimeout(() => el.classList.remove("show"), 1600);
 }
 
+function getEventKey(e) {
+  if (typeof e.code === "string") {
+    if (e.code.startsWith("Key")) {
+      return e.code.slice(3).toLowerCase();
+    }
+    if (e.code.startsWith("Digit")) {
+      return e.code.slice(5);
+    }
+  }
+
+  return typeof e.key === "string" ? e.key.toLowerCase() : "";
+}
+
 // ── Grid toggle ───────────────────────────────────────────────────────────────
 // Grid visibility is per-tab and lives only in the content script's memory.
 // The popup queries the active tab for current state, then sends a message to
@@ -66,6 +102,7 @@ function flashSaved() {
 
 const gridToggle = document.getElementById("gridToggle");
 const toggleLabel = document.getElementById("toggleLabel");
+const openOfflineViewerBtn = document.getElementById("openOfflineViewerBtn");
 
 function setToggleUI(visible, available) {
   gridToggle.checked = visible;
@@ -111,6 +148,10 @@ gridToggle.addEventListener("change", () => {
   });
 });
 
+openOfflineViewerBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
+});
+
 // ── Shortcut display ──────────────────────────────────────────────────────────
 
 function renderAllShortcuts() {
@@ -153,10 +194,11 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { stopRecording(false); return; }
   if (["Shift", "Alt", "Control", "Meta"].includes(e.key)) return;
   shortcuts[recordingAction] = {
-    key:   e.key.toLowerCase(),
+    key:   getEventKey(e),
     alt:   e.altKey,
     shift: e.shiftKey,
     ctrl:  e.ctrlKey,
+    meta:  e.metaKey,
   };
   stopRecording(true);
 }, true);
@@ -212,7 +254,7 @@ chrome.storage.sync.get(
   { shortcuts: DEFAULT_SHORTCUTS, sites: DEFAULT_SITES },
   function(data) {
     shortcuts = mergeShortcuts(data.shortcuts);
-    sites     = Array.isArray(data.sites) ? data.sites : DEFAULT_SITES.slice();
+    sites     = mergeSites(data.sites);
     renderAllShortcuts();
     renderSites();
   }

@@ -52,6 +52,22 @@ Popup extension umoznuje:
 - zapnout nebo vypnout grid
 - zmenit klavesove zkratky
 - upravit seznam webu, na kterych extension funguje
+- otevrit Offline Viewer pro lokalni videa
+
+### Offline Viewer
+
+Pokud chces pracovat se stazenym videem offline:
+
+1. Klikni na ikonu extension.
+2. Klikni na `Open Offline Viewer`.
+3. V nove zalozce klikni na `Choose video`.
+4. Vyber lokalni `.mp4` soubor.
+5. Pouzij `Show grid`, `Auto-map` nebo klavesove zkratky stejne jako na webu.
+
+Poznamka:
+
+- Pri primem otevreni `file://.../video.mp4` v Chrome se extension nechova spolehlive kvuli omezenim Chrome media vieweru.
+- Offline Viewer je doporucena cesta pro lokalni videa.
 
 ---
 
@@ -91,6 +107,8 @@ auto-detect.js
 perspective-transform.js
 popup.html
 popup.js
+viewer.html
+viewer.js
 models/
 node_modules/
 ```
