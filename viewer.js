@@ -10,6 +10,7 @@
   const statusPill = document.getElementById("statusPill");
   const toggleGridBtn = document.getElementById("toggleGridBtn");
   const autoMapBtn = document.getElementById("autoMapBtn");
+  const fullscreenBtn = document.getElementById("fullscreenBtn");
   const resetBtn = document.getElementById("resetBtn");
   const ctx = canvas.getContext("2d");
   const detector = window.createCourtDetector();
@@ -25,6 +26,9 @@
     toggle: { key: "h", alt: false, shift: true, ctrl: true, meta: false },
   };
   const DEFAULT_SHORTCUTS = IS_MAC ? MAC_DEFAULT_SHORTCUTS : LEGACY_DEFAULT_SHORTCUTS;
+  const DEFAULT_OFFLINE_SEEK_SECONDS = 5;
+  const OFFLINE_VIEWER_STATE_KEY = "offlineViewerGridVisible";
+  const OFFLINE_VIEWER_READY_KEY = "offlineViewerReady";
 
   let shortcuts = mergeShortcuts(null);
   let currentObjectUrl = null;
@@ -37,16 +41,41 @@
   let shiftPressed = false;
   let statusMessage = "";
   let statusTimeoutId = null;
+  let redirectingNativeFullscreen = false;
+  let seekSeconds = DEFAULT_OFFLINE_SEEK_SECONDS;
   let corners = createCenteredGrid();
 
-  chrome.storage.sync.get({ shortcuts: DEFAULT_SHORTCUTS }, (data) => {
+  chrome.storage.sync.get(
+    {
+      shortcuts: DEFAULT_SHORTCUTS,
+      offlineSeekSeconds: DEFAULT_OFFLINE_SEEK_SECONDS,
+    },
+    (data) => {
     shortcuts = mergeShortcuts(data.shortcuts);
-  });
+      seekSeconds = normalizeSeekSeconds(data.offlineSeekSeconds);
+    },
+  );
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "sync" && changes.shortcuts) {
       shortcuts = mergeShortcuts(changes.shortcuts.newValue);
     }
+
+    if (area === "sync" && changes.offlineSeekSeconds) {
+      seekSeconds = normalizeSeekSeconds(changes.offlineSeekSeconds.newValue);
+    }
+
+    if (area === "local" && changes[OFFLINE_VIEWER_STATE_KEY]) {
+      const nextVisible = !!changes[OFFLINE_VIEWER_STATE_KEY].newValue;
+      if (nextVisible !== gridVisible) {
+        showGrid(nextVisible);
+      }
+    }
+  });
+
+  chrome.storage.local.set({
+    [OFFLINE_VIEWER_STATE_KEY]: false,
+    [OFFLINE_VIEWER_READY_KEY]: true,
   });
 
   detector.warmup().then((state) => {
@@ -86,11 +115,20 @@
   video.addEventListener("emptied", () => {
     gridVisible = false;
     gridInitialized = false;
+    publishGridVisible();
     draw();
   });
 
   window.addEventListener("resize", resizeCanvas);
+  window.addEventListener("beforeunload", () => {
+    chrome.storage.local.set({
+      [OFFLINE_VIEWER_STATE_KEY]: false,
+      [OFFLINE_VIEWER_READY_KEY]: false,
+    });
+  });
   video.addEventListener("loadeddata", resizeCanvas);
+  document.addEventListener("fullscreenchange", handleFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
 
   toggleGridBtn.addEventListener("click", () => {
     showGrid(!gridVisible);
@@ -107,8 +145,17 @@
     setStatus("Grid reset to center.");
   });
 
-  document.addEventListener("keydown", (e) => {
+  fullscreenBtn.addEventListener("click", () => {
+    toggleFullscreen();
+  });
+
+  document.addEventListener("keydown", handleKeyDown, true);
+
+  document.addEventListener("keyup", handleKeyUp, true);
+
+  function handleKeyDown(e) {
     if (e.repeat) return;
+    if (shouldIgnoreHotkeys(e)) return;
 
     if (e.key === "Shift") {
       shiftPressed = true;
@@ -116,14 +163,32 @@
       return;
     }
 
+    if (matchesPlaybackShortcut(e, "Space")) {
+      swallowEvent(e);
+      togglePlayback();
+      return;
+    }
+
+    if (matchesPlaybackShortcut(e, "ArrowLeft")) {
+      swallowEvent(e);
+      seekBy(-seekSeconds);
+      return;
+    }
+
+    if (matchesPlaybackShortcut(e, "ArrowRight")) {
+      swallowEvent(e);
+      seekBy(seekSeconds);
+      return;
+    }
+
     if (matchesShortcut(e, shortcuts.map)) {
-      e.preventDefault();
+      swallowEvent(e);
       autoMapGrid();
       return;
     }
 
     if (matchesShortcut(e, shortcuts.reset)) {
-      e.preventDefault();
+      swallowEvent(e);
       corners = createCenteredGrid();
       gridInitialized = true;
       showGrid(true);
@@ -132,19 +197,30 @@
     }
 
     if (matchesShortcut(e, shortcuts.toggle)) {
-      e.preventDefault();
+      swallowEvent(e);
       showGrid(!gridVisible);
     }
-  });
+  }
 
-  document.addEventListener("keyup", (e) => {
+  function handleKeyUp(e) {
+    if (shouldIgnoreHotkeys(e)) return;
+
+    if (
+      matchesPlaybackShortcut(e, "Space") ||
+      matchesPlaybackShortcut(e, "ArrowLeft") ||
+      matchesPlaybackShortcut(e, "ArrowRight")
+    ) {
+      swallowEvent(e);
+      return;
+    }
+
     if (e.key === "Shift") {
       shiftPressed = false;
       draggingCorner = null;
       draggingGrid = false;
       draw();
     }
-  });
+  }
 
   document.addEventListener("mousedown", (e) => {
     if (!shiftPressed || videoStage.hidden) return;
@@ -218,10 +294,38 @@
     { passive: false },
   );
 
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (!message || message.target !== "offline-viewer") return false;
+
+    if (message.type === "getGridVisible") {
+      sendResponse({ gridVisible });
+      return true;
+    }
+
+    if (message.type === "setGridVisible") {
+      showGrid(!!message.value);
+      sendResponse({ ok: true, gridVisible });
+      return true;
+    }
+
+    return false;
+  });
+
   function setControlsEnabled(enabled) {
     toggleGridBtn.disabled = !enabled;
     autoMapBtn.disabled = !enabled;
+    fullscreenBtn.disabled = !enabled;
     resetBtn.disabled = !enabled;
+  }
+
+  function publishGridVisible() {
+    chrome.storage.local.set({ [OFFLINE_VIEWER_STATE_KEY]: !!gridVisible });
+  }
+
+  function normalizeSeekSeconds(value) {
+    return Number.isFinite(value)
+      ? Math.min(300, Math.max(1, Math.trunc(value)))
+      : DEFAULT_OFFLINE_SEEK_SECONDS;
   }
 
   function mergeShortcuts(stored) {
@@ -261,6 +365,36 @@
       !!e.shiftKey === !!binding.shift &&
       !!e.ctrlKey === !!binding.ctrl &&
       !!e.metaKey === !!binding.meta
+    );
+  }
+
+  function matchesPlaybackShortcut(e, code) {
+    return (
+      e.code === code &&
+      !e.shiftKey &&
+      !e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey
+    );
+  }
+
+  function swallowEvent(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof e.stopImmediatePropagation === "function") {
+      e.stopImmediatePropagation();
+    }
+  }
+
+  function shouldIgnoreHotkeys(e) {
+    const target = e.target;
+    return !!(
+      target &&
+      (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      )
     );
   }
 
@@ -310,6 +444,100 @@
     draw();
   }
 
+  function getFullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+
+  function isViewerFullscreen() {
+    return getFullscreenElement() === stageShell;
+  }
+
+  function syncFullscreenButton() {
+    fullscreenBtn.textContent = isViewerFullscreen() ? "Exit fullscreen" : "Fullscreen";
+  }
+
+  function scheduleResize() {
+    requestAnimationFrame(() => {
+      resizeCanvas();
+      setTimeout(resizeCanvas, 60);
+    });
+  }
+
+  async function toggleFullscreen() {
+    if (videoStage.hidden) return;
+
+    try {
+      if (isViewerFullscreen()) {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      } else if (stageShell.requestFullscreen) {
+        await stageShell.requestFullscreen();
+      } else if (stageShell.webkitRequestFullscreen) {
+        stageShell.webkitRequestFullscreen();
+      }
+    } catch (error) {
+      console.error(error);
+      setStatus("Fullscreen could not be opened.");
+    }
+  }
+
+  function togglePlayback() {
+    if (!video.src) return;
+
+    if (video.paused) {
+      video.play().catch((error) => {
+        console.error(error);
+      });
+    } else {
+      video.pause();
+    }
+  }
+
+  function seekBy(seconds) {
+    if (!Number.isFinite(video.duration)) return;
+
+    const nextTime = Math.max(0, Math.min(video.duration, video.currentTime + seconds));
+    video.currentTime = nextTime;
+  }
+
+  async function redirectNativeFullscreenToStage() {
+    if (redirectingNativeFullscreen) return;
+
+    redirectingNativeFullscreen = true;
+
+    try {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+
+      if (stageShell.requestFullscreen) {
+        await stageShell.requestFullscreen();
+      } else if (stageShell.webkitRequestFullscreen) {
+        stageShell.webkitRequestFullscreen();
+      }
+    } catch (error) {
+      console.error(error);
+      setStatus("Fullscreen could not be opened.");
+    } finally {
+      redirectingNativeFullscreen = false;
+    }
+  }
+
+  function handleFullscreenChange() {
+    if (getFullscreenElement() === video) {
+      redirectNativeFullscreenToStage();
+      return;
+    }
+
+    syncFullscreenButton();
+    scheduleResize();
+  }
+
   function showGrid(visible) {
     gridVisible = visible;
     if (visible && !gridInitialized) {
@@ -317,6 +545,7 @@
       gridInitialized = true;
     }
 
+    publishGridVisible();
     toggleGridBtn.textContent = visible ? "Hide grid" : "Show grid";
     statusPill.textContent = visible ? "Grid visible" : "Grid hidden";
     draw();
@@ -493,4 +722,6 @@
     drawCorners();
     drawStatus();
   }
+
+  syncFullscreenButton();
 })();

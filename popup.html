@@ -268,6 +268,39 @@
       line-height: 1.5;
     }
 
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 8px;
+      padding: 7px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .setting-row label {
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .setting-row input {
+      width: 64px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 5px 8px;
+      font-size: 12px;
+      text-align: right;
+      outline: none;
+    }
+
+    .setting-row input:focus {
+      border-color: var(--accent);
+    }
+
     .save-notice {
       text-align: center;
       font-size: 11px;
@@ -380,7 +413,11 @@
   <section>
     <div class="section-title">Offline Viewer</div>
     <button class="btn-add" id="openOfflineViewerBtn" style="width:100%; height:34px;">Open Offline Viewer</button>
-    <div class="hint">Nahraj lokalni video do samostatne extension stranky a pracuj s nim offline.</div>
+    <div class="setting-row">
+      <label for="seekSecondsInput">Arrow skip (s)</label>
+      <input type="number" id="seekSecondsInput" min="1" max="300" step="1" value="5" />
+    </div>
+    <div class="hint">Nahraj lokalni video do samostatne extension stranky a pracuj s nim offline. Nastaveni plati pro sipky `←` a `→` ve vieweru.</div>
   </section>
 
   <section>

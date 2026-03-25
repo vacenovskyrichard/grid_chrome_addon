@@ -160,6 +160,20 @@
       min-height: 70vh;
     }
 
+    .stage-shell:fullscreen,
+    .stage-shell:-webkit-full-screen {
+      min-height: 100vh;
+      padding: 0;
+      background: black;
+    }
+
+    .stage-shell:fullscreen .video-stage video,
+    .stage-shell:-webkit-full-screen .video-stage video {
+      max-width: 100vw;
+      max-height: 100vh;
+      border-radius: 0;
+    }
+
     .empty-state {
       max-width: 540px;
       text-align: center;
@@ -269,6 +283,7 @@
       <input id="fileInput" type="file" accept="video/*" />
       <button class="button" id="toggleGridBtn" disabled>Show grid</button>
       <button class="button primary" id="autoMapBtn" disabled>Auto-map</button>
+      <button class="button" id="fullscreenBtn" disabled>Fullscreen</button>
       <button class="button warn" id="resetBtn" disabled>Reset</button>
       <span class="filename" id="fileName">No file selected</span>
     </div>
@@ -287,7 +302,7 @@
         </div>
 
         <div class="video-stage" id="videoStage" hidden>
-          <video id="offlineVideo" controls playsinline></video>
+          <video id="offlineVideo" controls playsinline controlsList="nofullscreen"></video>
           <canvas id="gridCanvas"></canvas>
         </div>
       </div>
@@ -304,6 +319,14 @@
         <div>
           <strong>Toggle</strong>
           `Alt+H` zobrazi nebo skryje grid. `Alt+R` vrati grid do stredu.
+        </div>
+        <div>
+          <strong>Playback</strong>
+          `Space` prehrava nebo pauzne video. Sipky `←` a `→` skacou o nastaveny pocet sekund.
+        </div>
+        <div>
+          <strong>Fullscreen</strong>
+          Pro offline video pouzij tlacitko `Fullscreen` ve vieweru, aby grid zustal viditelny i po zvetseni.
         </div>
       </div>
     </div>

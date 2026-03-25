@@ -63,6 +63,9 @@ Pokud chces pracovat se stazenym videem offline:
 3. V nove zalozce klikni na `Choose video`.
 4. Vyber lokalni `.mp4` soubor.
 5. Pouzij `Show grid`, `Auto-map` nebo klavesove zkratky stejne jako na webu.
+6. Pokud chces video zvetsit, pouzij tlacitko `Fullscreen` primo ve vieweru, aby grid zustal viditelny.
+7. `Space` prehrava nebo pauzne video, sipky `←` a `→` posouvaji video o nastaveny pocet sekund.
+8. Pocet sekund pro skok sipkami lze zmenit v popupu extension v sekci `Offline Viewer`.
 
 Poznamka:
 

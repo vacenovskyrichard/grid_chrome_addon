@@ -33,6 +33,7 @@ function mergeSites(stored) {
 let shortcuts = {};
 let sites = [];
 let recordingAction = null;
+let offlineSeekSeconds = 5;
 
 // ── Deep-merge shortcuts ──────────────────────────────────────────────────────
 
@@ -103,6 +104,10 @@ function getEventKey(e) {
 const gridToggle = document.getElementById("gridToggle");
 const toggleLabel = document.getElementById("toggleLabel");
 const openOfflineViewerBtn = document.getElementById("openOfflineViewerBtn");
+const seekSecondsInput = document.getElementById("seekSecondsInput");
+const OFFLINE_VIEWER_URL = chrome.runtime.getURL("viewer.html");
+const OFFLINE_VIEWER_STATE_KEY = "offlineViewerGridVisible";
+const OFFLINE_VIEWER_READY_KEY = "offlineViewerReady";
 
 function setToggleUI(visible, available) {
   gridToggle.checked = visible;
@@ -129,6 +134,85 @@ function sendToTab(message, callback) {
 }
 
 // Query the tab's current state when the popup opens
+function withActiveTab(callback) {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    callback(tabs[0] || null);
+  });
+}
+
+function isOfflineViewerTab(tab) {
+  return !!tab && typeof tab.url === "string" && tab.url.startsWith(OFFLINE_VIEWER_URL);
+}
+
+function getOfflineViewerState(callback) {
+  chrome.storage.local.get(
+    {
+      [OFFLINE_VIEWER_STATE_KEY]: false,
+      [OFFLINE_VIEWER_READY_KEY]: false,
+    },
+    (data) => {
+      callback({
+        gridVisible: !!data[OFFLINE_VIEWER_STATE_KEY],
+        ready: !!data[OFFLINE_VIEWER_READY_KEY],
+      });
+    },
+  );
+}
+
+function fallbackToOfflineViewer(callback) {
+  getOfflineViewerState((response) => {
+    if (response.ready) {
+      callback({ gridVisible: response.gridVisible });
+    } else {
+      callback(null);
+    }
+  });
+}
+
+function setOfflineViewerState(visible, callback) {
+  chrome.storage.local.set({ [OFFLINE_VIEWER_STATE_KEY]: !!visible }, () => {
+    if (callback) callback({ ok: true, gridVisible: !!visible });
+  });
+}
+
+function sendToTab(message, callback) {
+  withActiveTab((tab) => {
+    if (!tab) {
+      if (callback) callback(null);
+      return;
+    }
+
+    if (isOfflineViewerTab(tab)) {
+      if (message.type === "getGridVisible") {
+        getOfflineViewerState((response) => {
+          if (callback) callback(response);
+        });
+        return;
+      }
+
+      if (message.type === "setGridVisible") {
+        setOfflineViewerState(message.value, (response) => {
+          if (callback) callback(response);
+        });
+        return;
+      }
+
+      if (callback) callback(null);
+      return;
+    }
+
+    chrome.tabs.sendMessage(tab.id, message, (response) => {
+      if (chrome.runtime.lastError) {
+        fallbackToOfflineViewer((fallbackResponse) => {
+          if (callback) callback(fallbackResponse);
+        });
+        return;
+      }
+      if (callback) callback(response);
+    });
+  });
+}
+
 sendToTab({ type: "getGridVisible" }, (response) => {
   if (response === null) {
     setToggleUI(false, false); // content script not on this tab
@@ -143,13 +227,31 @@ gridToggle.addEventListener("change", () => {
   sendToTab({ type: "setGridVisible", value: visible }, (response) => {
     if (response === null) {
       // Tab didn't respond — revert the toggle visually
-      setToggleUI(!visible, false);
+      fallbackToOfflineViewer((fallbackResponse) => {
+        if (fallbackResponse === null) {
+          setToggleUI(!visible, false);
+          return;
+        }
+
+        setOfflineViewerState(visible, (storedResponse) => {
+          setToggleUI(storedResponse.gridVisible, true);
+        });
+      });
     }
   });
 });
 
 openOfflineViewerBtn.addEventListener("click", () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
+});
+
+seekSecondsInput.addEventListener("change", () => {
+  const parsed = Number.parseInt(seekSecondsInput.value, 10);
+  const nextValue = Number.isFinite(parsed) ? Math.min(300, Math.max(1, parsed)) : 5;
+  offlineSeekSeconds = nextValue;
+  seekSecondsInput.value = String(nextValue);
+  chrome.storage.sync.set({ offlineSeekSeconds: nextValue });
+  flashSaved();
 });
 
 // ── Shortcut display ──────────────────────────────────────────────────────────
@@ -251,10 +353,14 @@ function addSite() {
 // ── Load from storage & initialise ───────────────────────────────────────────
 
 chrome.storage.sync.get(
-  { shortcuts: DEFAULT_SHORTCUTS, sites: DEFAULT_SITES },
+  { shortcuts: DEFAULT_SHORTCUTS, sites: DEFAULT_SITES, offlineSeekSeconds: 5 },
   function(data) {
     shortcuts = mergeShortcuts(data.shortcuts);
     sites     = mergeSites(data.sites);
+    offlineSeekSeconds = Number.isFinite(data.offlineSeekSeconds)
+      ? Math.min(300, Math.max(1, Math.trunc(data.offlineSeekSeconds)))
+      : 5;
+    seekSecondsInput.value = String(offlineSeekSeconds);
     renderAllShortcuts();
     renderSites();
   }
